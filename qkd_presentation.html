@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="slides-format" content="viewport" />
+  <title>Quantum Key Distribution</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @theme {
+      --color-bg: #0b1020;
+      --color-bg-deep: #060914;
+      --color-surface: #131a33;
+      --color-text: #f3f7ff;
+      --color-text-secondary: #d4def7;
+      --color-text-muted: #94a3c7;
+      --color-accent-1: #7c3aed;
+      --color-accent-2: #06b6d4;
+      --color-accent-3: #a78bfa;
+      --color-glass-bg: rgba(255,255,255,0.07);
+      --color-glass-border: rgba(255,255,255,0.10);
+      --color-vignette: rgba(0,0,0,0.42);
+      --font-display: 'Instrument Serif', Georgia, serif;
+      --font-body: 'Inter', sans-serif;
+    }
+  </style>
+  <style>
+    :root { --color-bg: #0b1020; --color-text: #f3f7ff; --glow-color-rgb: 124,58,237; --font-body:'Inter',sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--color-bg); }
+    body { font-family: var(--font-body); color: var(--color-text); overflow: hidden; width: 100vw; height: 100vh; }
+    .deck { width: 100vw; height: 100vh; position: relative; }
+    .slide { position: absolute; inset: 0; background: var(--color-bg); display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.96); transition: opacity .7s ease, transform .7s ease; pointer-events: none; overflow: hidden; }
+    .slide.active { opacity: 1; transform: scale(1); pointer-events: all; }
+    .slide > .content { position: relative; z-index: 2; width: 100%; max-width: 1160px; padding: clamp(1.5rem, 4vw, 4rem); }
+    .nav-controls { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; z-index: 100; background: rgba(10,16,32,.65); backdrop-filter: blur(10px); padding: 10px 22px; border-radius: 999px; border: 1px solid rgba(255,255,255,.10); }
+    .nav-btn { width: 40px; height: 40px; border: none; border-radius: 50%; color: white; background: rgba(255,255,255,.08); cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center;}
+    .slide-dots { display: flex; gap: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.18); cursor: pointer; transition: all 0.2s; }
+    .dot.active { background: #06b6d4; transform: scale(1.25); }
+    .slide-counter { font-size: .85rem; color: #c7d2fe; min-width: 48px; text-align: center; }
+    .reveal { opacity: 0; transform: translateY(20px); }
+    .gradient-mesh { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .blob { position: absolute; border-radius: 999px; filter: blur(80px); animation: float-slow 14s ease-in-out infinite; }
+    .blob:nth-child(2) { animation: float-drift 18s ease-in-out infinite; }
+    .blob:nth-child(3) { animation: float-slow 20s ease-in-out infinite reverse; }
+    .slide::before { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); background-size: 256px 256px; opacity: .03; mix-blend-mode: overlay; }
+    .slide::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background: radial-gradient(circle at center, transparent 50%, rgba(0,0,0,.42) 100%); }
+    .text-glow { text-shadow: 0 0 22px rgba(var(--glow-color-rgb),.45); }
+    .bar-track { background: rgba(255,255,255,.09); border-radius: 999px; height: 18px; overflow: hidden; }
+    .bar-fill { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #06b6d4); }
+    .pill { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); border-radius: 999px; padding: .45rem .85rem; }
+    @keyframes float-slow { 0%{transform:translate(0,0) scale(1)} 25%{transform:translate(50px,-40px) scale(1.08)} 50%{transform:translate(-30px,30px) scale(.92)} 75%{transform:translate(40px,16px) scale(1.04)} 100%{transform:translate(0,0) scale(1)} }
+    @keyframes float-drift { 0%{transform:translate(0,0)} 33%{transform:translate(-40px,-50px)} 66%{transform:translate(36px,24px)} 100%{transform:translate(0,0)} }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    .qbit { animation: float 3.2s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .2s !important; } }
+  </style>
+</head>
+<body>
+<div class="mouse-spotlight" style="position:fixed;inset:0;z-index:99;pointer-events:none;"></div>
+<div class="deck">
+
+  <div class="slide slide-1 active" data-slide="1">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:460px;height:460px;top:-120px;right:-80px;background:var(--color-accent-1);opacity:.18"></div>
+      <div class="blob" style="width:300px;height:300px;bottom:-70px;left:-50px;background:var(--color-accent-2);opacity:.14"></div>
+      <div class="blob" style="width:220px;height:220px;top:44%;left:16%;background:var(--color-accent-3);opacity:.10"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1"></canvas>
+    
+    <div class="content text-center relative z-10 flex flex-col items-center justify-center">
+      
+      <h1 class="font-display text-[clamp(2.4rem,6vw,5rem)] font-black bg-linear-to-r from-accent-1 via-accent-2 to-accent-3 bg-clip-text text-transparent tracking-tight mb-4 reveal">
+        Quantum Key Distribution
+      </h1>
+      <p class="text-[clamp(.9rem,1.5vw,1.25rem)] tracking-[5px] uppercase text-text-muted reveal mb-8">
+        Secure key exchange using quantum physics
+      </p>
+      
+      <div class="reveal w-full max-w-3xl mt-4 mb-6">
+        <p class="text-xs tracking-[3px] uppercase text-text-muted mb-4">Group 1</p>
+        <div class="flex flex-wrap justify-center gap-x-10 gap-y-4 text-text-secondary">
+            <div class="flex flex-col items-center">
+                <span class="font-semibold text-[clamp(1rem,1.2vw,1.1rem)] text-text-primary">Adnan Sami</span>
+                <span class="text-xs tracking-wider opacity-75 mt-1">ID: 1650</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="font-semibold text-[clamp(1rem,1.2vw,1.1rem)] text-text-primary">Md Kamruzzaman</span>
+                <span class="text-xs tracking-wider opacity-75 mt-1">ID: 1633</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="font-semibold text-[clamp(1rem,1.2vw,1.1rem)] text-text-primary">Tanvir ahmed Shuvo</span>
+                <span class="text-xs tracking-wider opacity-75 mt-1">ID: 1961</span>
+            </div>
+        </div>
+      </div>
+
+      <div class="mt-8 flex flex-wrap gap-3 justify-center text-sm text-text-secondary reveal">
+        <div class="pill">Communication Engineering</div>
+        <div class="pill">Core Focus: Principles, Protocols, Challenges & Uses</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-2" data-slide="2">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:340px;height:340px;top:-70px;right:-50px;background:var(--color-accent-1);opacity:.08"></div>
+      <div class="blob" style="width:260px;height:260px;bottom:-60px;left:-40px;background:var(--color-accent-2);opacity:.07"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-8 reveal">Agenda and team split</h2>
+      <div class="grid grid-cols-3 gap-6">
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <div class="text-3xl mb-3 font-display opacity-80">01</div>
+          <h3 class="text-2xl font-bold mb-3 text-accent-2">Member 1</h3>
+          <p class="text-lg text-text-secondary mb-3">QKD basics and working principle</p>
+          <ul class="text-text-muted leading-7 text-base">
+            <li>• Need for secure key exchange</li>
+            <li>• Qubits, polarization, measurement</li>
+            <li>• Why eavesdropping can be detected</li>
+          </ul>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <div class="text-3xl mb-3 font-display opacity-80">02</div>
+          <h3 class="text-2xl font-bold mb-3 text-accent-2">Member 2</h3>
+          <p class="text-lg text-text-secondary mb-3">Core QKD protocols</p>
+          <ul class="text-text-muted leading-7 text-base">
+            <li>• BB84 prepare-and-measure</li>
+            <li>• E91 entanglement-based idea</li>
+            <li>• Decoy-state improvements</li>
+          </ul>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <div class="text-3xl mb-3 font-display opacity-80">03</div>
+          <h3 class="text-2xl font-bold mb-3 text-accent-2">Member 3</h3>
+          <p class="text-lg text-text-secondary mb-3">Challenges, applications, future</p>
+          <ul class="text-text-muted leading-7 text-base">
+            <li>• Distance and photon loss</li>
+            <li>• Hardware cost and attacks</li>
+            <li>• Satellite QKD and hybrid security</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-3" data-slide="3">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:330px;height:330px;top:-90px;right:-70px;background:var(--color-accent-3);opacity:.08"></div>
+      <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-30px;background:var(--color-accent-2);opacity:.08"></div>
+    </div>
+    <div class="content">
+      <div class="grid grid-cols-2 gap-12 items-center">
+        <div>
+          <div class="uppercase tracking-[4px] text-text-muted mb-3 reveal">Core focus 1</div>
+          <h2 class="font-display text-[clamp(2rem,4vw,3.2rem)] font-bold mb-5 reveal">What is QKD?</h2>
+          <p class="text-lg text-text-secondary leading-8 mb-5 reveal">Quantum Key Distribution is a method for two parties, usually called Alice and Bob, to create a shared secret key by sending quantum states and then using a public classical channel for checking and correction.</p>
+          <ul class="space-y-3 text-base text-text-secondary reveal">
+            <li>• It is used for key exchange, not for sending the actual message.</li>
+            <li>• Security comes from quantum measurement disturbance and the no-cloning idea.</li>
+            <li>• If Eve intercepts the quantum states, extra errors appear and Alice and Bob can detect it.</li>
+          </ul>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-[28px] p-8 reveal">
+          <div class="grid grid-cols-2 gap-4 text-center">
+            <div class="bg-white/5 rounded-2xl p-5 flex flex-col items-center">
+              <svg class="w-10 h-10 mb-3 text-accent-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+              <div class="font-semibold">Alice</div>
+              <div class="text-sm text-text-muted">Sends photons</div>
+            </div>
+            <div class="bg-white/5 rounded-2xl p-5 flex flex-col items-center">
+              <svg class="w-10 h-10 mb-3 text-accent-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+              <div class="font-semibold">Bob</div>
+              <div class="text-sm text-text-muted">Measures photons</div>
+            </div>
+            <div class="bg-white/5 rounded-2xl p-5 flex flex-col items-center">
+              <svg class="w-10 h-10 mb-3 text-accent-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" /></svg>
+              <div class="font-semibold">Quantum channel</div>
+              <div class="text-sm text-text-muted">Carries qubits</div>
+            </div>
+            <div class="bg-white/5 rounded-2xl p-5 flex flex-col items-center">
+              <svg class="w-10 h-10 mb-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
+              <div class="font-semibold">Classical channel</div>
+              <div class="text-sm text-text-muted">Public discussion</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-4" data-slide="4">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:280px;height:280px;top:0;left:-60px;background:var(--color-accent-1);opacity:.08"></div>
+      <div class="blob" style="width:300px;height:300px;bottom:-80px;right:-60px;background:var(--color-accent-2);opacity:.08"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-8 reveal">How QKD works in 5 steps</h2>
+      <div class="grid grid-cols-5 gap-4">
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl p-5 reveal"><div class="text-3xl font-display opacity-80 mb-2">1</div><div class="font-semibold mb-2">Prepare</div><div class="text-sm text-text-secondary">Alice encodes bits in photon states using chosen bases.</div></div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl p-5 reveal"><div class="text-3xl font-display opacity-80 mb-2">2</div><div class="font-semibold mb-2">Measure</div><div class="text-sm text-text-secondary">Bob randomly selects measurement bases for each photon.</div></div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl p-5 reveal"><div class="text-3xl font-display opacity-80 mb-2">3</div><div class="font-semibold mb-2">Sift</div><div class="text-sm text-text-secondary">They keep only positions where their bases match.</div></div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl p-5 reveal"><div class="text-3xl font-display opacity-80 mb-2">4</div><div class="font-semibold mb-2">Check</div><div class="text-sm text-text-secondary">They compare a sample to estimate the quantum bit error rate.</div></div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl p-5 reveal"><div class="text-3xl font-display opacity-80 mb-2">5</div><div class="font-semibold mb-2">Finalize</div><div class="text-sm text-text-secondary">Error correction and privacy amplification produce the secret key.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-5" data-slide="5">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:380px;height:380px;top:-120px;right:-100px;background:var(--color-accent-1);opacity:.10"></div>
+      <div class="blob" style="width:240px;height:240px;bottom:-50px;left:-20px;background:var(--color-accent-2);opacity:.08"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1"></canvas>
+    <div class="content text-center">
+      <div class="uppercase tracking-[5px] text-text-muted mb-3 reveal">Core focus 2</div>
+      <h2 class="font-display text-[clamp(2.2rem,5vw,4rem)] font-bold text-glow mb-4 reveal">Major QKD protocols</h2>
+      <p class="max-w-3xl mx-auto text-lg text-text-secondary reveal">Different protocols use different physical ideas, but all aim to generate a secret key while revealing interference from an eavesdropper.</p>
+    </div>
+  </div>
+
+  <div class="slide slide-6" data-slide="6">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:300px;height:300px;top:-70px;right:-50px;background:var(--color-accent-1);opacity:.08"></div>
+      <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-40px;background:var(--color-accent-3);opacity:.07"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-8 reveal">Protocol comparison</h2>
+      <div class="grid grid-cols-3 gap-6">
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal hover:-translate-y-1 transition">
+          <svg class="w-10 h-10 mb-4 text-accent-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+          <h3 class="text-2xl font-bold mb-3 text-accent-2">BB84</h3>
+          <p class="text-text-secondary leading-7">The classic 1984 prepare-and-measure protocol. Alice sends non-orthogonal states and Bob measures with random bases.</p>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal hover:-translate-y-1 transition">
+          <svg class="w-10 h-10 mb-4 text-accent-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z" /></svg>
+          <h3 class="text-2xl font-bold mb-3 text-accent-2">E91</h3>
+          <p class="text-text-secondary leading-7">Uses entangled photon pairs. Security is linked to quantum correlations and Bell-type inequalities.</p>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal hover:-translate-y-1 transition">
+          <svg class="w-10 h-10 mb-4 text-accent-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+          <h3 class="text-2xl font-bold mb-3 text-accent-2">Decoy-state</h3>
+          <p class="text-text-secondary leading-7">Adds extra intensity levels to better handle practical weak laser sources and improve security analysis.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-7" data-slide="7">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:320px;height:320px;top:-80px;left:-40px;background:var(--color-accent-1);opacity:.08"></div>
+      <div class="blob" style="width:260px;height:260px;bottom:-60px;right:-40px;background:var(--color-accent-2);opacity:.07"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-7 reveal">Why BB84 became the foundation</h2>
+      <div class="grid grid-cols-2 gap-8 items-center">
+        <div class="reveal">
+          <ul class="space-y-4 text-lg text-text-secondary leading-8">
+            <li>• Proposed by Charles Bennett and Gilles Brassard in 1984.</li>
+            <li>• Uses two different polarization bases to encode bits.</li>
+            <li>• Non-orthogonal states cannot be perfectly distinguished or copied.</li>
+            <li>• After basis sifting, Alice and Bob keep matching results as the raw key.</li>
+          </ul>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-[28px] p-8 reveal">
+          <div class="grid grid-cols-2 gap-4 text-center">
+            <div class="bg-white/5 rounded-2xl p-5 flex flex-col items-center">
+              <div class="font-bold mb-4">Rectilinear</div>
+              <svg class="w-10 h-10 text-accent-2 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m0-16l-4 4m4-4l4 4m-4 12l-4-4m4 4l4-4M4 12h16m-16 0l4-4m-4 4l4 4m12-4l-4-4m4 4l-4 4" /></svg>
+              <div class="text-sm text-text-muted mt-2">0 or 1</div>
+            </div>
+            <div class="bg-white/5 rounded-2xl p-5 flex flex-col items-center">
+              <div class="font-bold mb-4">Diagonal</div>
+              <svg class="w-10 h-10 text-accent-1 mb-2 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m0-16l-4 4m4-4l4 4m-4 12l-4-4m4 4l4-4M4 12h16m-16 0l4-4m-4 4l4 4m12-4l-4-4m4 4l-4 4" /></svg>
+              <div class="text-sm text-text-muted mt-2">0 or 1</div>
+            </div>
+            <div class="col-span-2 bg-white/5 rounded-2xl p-5 text-left">
+              <div class="font-semibold mb-2">Key idea</div>
+              <div class="text-text-secondary">If Eve measures in the wrong basis, she changes the state and increases the error rate.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-8" data-slide="8">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:330px;height:330px;top:-60px;right:-30px;background:var(--color-accent-3);opacity:.08"></div>
+      <div class="blob" style="width:260px;height:260px;bottom:-70px;left:-50px;background:var(--color-accent-2);opacity:.08"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-8 reveal">Strengths and limitations</h2>
+      <div class="grid grid-cols-2 gap-6">
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <div class="flex items-center gap-3 mb-4">
+            
+            <h3 class="text-2xl font-bold text-accent-2">Strengths</h3>
+          </div>
+          <ul class="space-y-3 text-text-secondary leading-7">
+            <li>• Security is tied to physical laws, not only mathematical hardness.</li>
+            <li>• Eavesdropping creates detectable disturbance.</li>
+            <li>• Useful for very high-security key exchange.</li>
+          </ul>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <div class="flex items-center gap-3 mb-4">
+            <h3 class="text-2xl font-bold text-accent-2">Limitations</h3>
+          </div>
+          <ul class="space-y-3 text-text-secondary leading-7">
+            <li>• Works only for key distribution, not direct large data transfer.</li>
+            <li>• Needs special optics, detectors, and stable channels.</li>
+            <li>• Real systems can still suffer from implementation flaws.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-9" data-slide="9">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:420px;height:420px;top:-120px;right:-90px;background:var(--color-accent-2);opacity:.10"></div>
+      <div class="blob" style="width:250px;height:250px;bottom:-40px;left:-20px;background:var(--color-accent-1);opacity:.09"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1"></canvas>
+    <div class="content text-center">
+      <div class="uppercase tracking-[5px] text-text-muted mb-3 reveal">Core focus 3</div>
+      <h2 class="font-display text-[clamp(2.2rem,5vw,4rem)] font-bold mb-4 reveal">Challenges and real-world uses</h2>
+      <p class="max-w-3xl mx-auto text-lg text-text-secondary reveal">Practical QKD must overcome distance, device, and cost constraints before it can scale into large communication networks.</p>
+    </div>
+  </div>
+
+  <div class="slide slide-10" data-slide="10">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:300px;height:300px;top:-70px;left:-30px;background:var(--color-accent-1);opacity:.08"></div>
+      <div class="blob" style="width:250px;height:250px;bottom:-60px;right:-50px;background:var(--color-accent-2);opacity:.07"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-8 reveal">Main technical challenges</h2>
+      <div class="space-y-6">
+        <div class="reveal">
+          <div class="flex justify-between mb-2 text-text-secondary"><span>Distance limitation and photon loss</span><span>Very high</span></div>
+          <div class="bar-track"><div class="bar-fill" data-width="92"></div></div>
+        </div>
+        <div class="reveal">
+          <div class="flex justify-between mb-2 text-text-secondary"><span>Hardware cost and alignment</span><span>High</span></div>
+          <div class="bar-track"><div class="bar-fill" data-width="82"></div></div>
+        </div>
+        <div class="reveal">
+          <div class="flex justify-between mb-2 text-text-secondary"><span>Detector and source imperfections</span><span>High</span></div>
+          <div class="bar-track"><div class="bar-fill" data-width="76"></div></div>
+        </div>
+        <div class="reveal">
+          <div class="flex justify-between mb-2 text-text-secondary"><span>Large-scale network deployment</span><span>Medium to high</span></div>
+          <div class="bar-track"><div class="bar-fill" data-width="68"></div></div>
+        </div>
+      </div>
+      <p class="mt-7 text-text-muted text-base reveal">Quantum signals weaken strongly with distance and cannot be simply amplified like ordinary optical communication signals.</p>
+    </div>
+  </div>
+
+  <div class="slide slide-11" data-slide="11">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:320px;height:320px;top:-90px;right:-50px;background:var(--color-accent-3);opacity:.08"></div>
+      <div class="blob" style="width:240px;height:240px;bottom:-60px;left:-30px;background:var(--color-accent-2);opacity:.07"></div>
+    </div>
+    <div class="content">
+      <h2 class="font-display text-[clamp(2rem,4vw,3rem)] font-bold mb-8 reveal">Applications and future direction</h2>
+      <div class="grid grid-cols-3 gap-6">
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <svg class="w-10 h-10 mb-4 text-accent-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" /></svg>
+          <h3 class="text-xl font-bold mb-3">Finance & Government</h3>
+          <p class="text-text-secondary">Used where key compromise is unacceptable and communication confidentiality has long-term value.</p>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <svg class="w-10 h-10 mb-4 text-accent-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" /></svg>
+          <h3 class="text-xl font-bold mb-3">Satellite QKD</h3>
+          <p class="text-text-secondary">Promising for extending secure key exchange beyond the distance limits of terrestrial fiber links.</p>
+        </div>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-3xl p-7 reveal">
+          <svg class="w-10 h-10 mb-4 text-accent-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>
+          <h3 class="text-xl font-bold mb-3">Hybrid security</h3>
+          <p class="text-text-secondary">Many experts expect QKD to be combined with post-quantum cryptography in future secure architectures.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide slide-12" data-slide="12">
+    <div class="gradient-mesh">
+      <div class="blob" style="width:430px;height:430px;top:-110px;right:-90px;background:var(--color-accent-1);opacity:.16"></div>
+      <div class="blob" style="width:280px;height:280px;bottom:-80px;left:-40px;background:var(--color-accent-2);opacity:.12"></div>
+      <div class="blob" style="width:220px;height:220px;top:48%;left:18%;background:var(--color-accent-3);opacity:.10"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1"></canvas>
+    <div class="content text-center">
+      <div class="w-24 h-1 bg-gradient-to-r from-accent-1 to-accent-2 mx-auto mb-8 rounded-full reveal"></div>
+      <h2 class="font-display text-[clamp(2.5rem,6vw,4.6rem)] font-bold bg-linear-to-r from-accent-1 via-accent-2 to-accent-3 bg-clip-text text-transparent mb-4 reveal">Thank You</h2>
+      <p class="text-lg tracking-[4px] uppercase text-text-muted reveal">Questions and discussion</p>
+      <div class="mt-8 grid grid-cols-3 gap-4 reveal max-w-3xl mx-auto">
+        <div class="bg-white/6 border border-white/5 rounded-2xl p-4 text-sm text-text-secondary">Member 1: Basics</div>
+        <div class="bg-white/6 border border-white/5 rounded-2xl p-4 text-sm text-text-secondary">Member 2: Protocols</div>
+        <div class="bg-white/6 border border-white/5 rounded-2xl p-4 text-sm text-text-secondary">Member 3: Challenges & uses</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="nav-controls">
+  <button class="nav-btn" onclick="changeSlide(-1)" aria-label="Previous slide">
+    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+  </button>
+  <div class="slide-dots" id="dots"></div>
+  <button class="nav-btn" onclick="changeSlide(1)" aria-label="Next slide">
+    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+  </button>
+  <span class="slide-counter" id="counter">1 / 12</span>
+</div>
+
+<script>
+let current = 1;
+const total = document.querySelectorAll('.slide').length;
+const dotsContainer = document.getElementById('dots');
+const counter = document.getElementById('counter');
+
+for (let i = 1; i <= total; i++) { 
+    const dot = document.createElement('div'); 
+    dot.className = 'dot' + (i === 1 ? ' active' : ''); 
+    dot.onclick = () => goToSlide(i); 
+    dotsContainer.appendChild(dot); 
+}
+
+function goToSlide(n) { 
+    const prev = document.querySelector('.slide.active'); 
+    const next = document.querySelector(`.slide[data-slide="${n}"]`); 
+    if (prev) prev.classList.remove('active'); 
+    if (next) { next.classList.add('active'); animateSlide(next); } 
+    current = n; 
+    updateNav(); 
+}
+
+function changeSlide(dir) { 
+    let next = current + dir; 
+    if (next < 1) next = total; 
+    if (next > total) next = 1; 
+    goToSlide(next); 
+}
+
+function updateNav() { 
+    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === current)); 
+    counter.textContent = current + ' / ' + total; 
+}
+
+document.addEventListener('keydown', e => { 
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); } 
+    if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); } 
+});
+
+let touchStartX = 0; 
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }); 
+document.addEventListener('touchend', e => { 
+    const diff = touchStartX - e.changedTouches[0].clientX; 
+    if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1); 
+});
+
+function animateSlide(slide) {
+  if (!slide) return;
+  slide.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transition = 'none'; 
+    el.style.opacity = '0'; 
+    el.style.transform = 'translateY(20px)'; 
+    el.offsetHeight; // trigger reflow
+    const delay = i * 0.08; 
+    el.style.transition = `opacity 0.35s ease ${delay}s, transform 0.35s ease ${delay}s`; 
+    el.style.opacity = '1'; 
+    el.style.transform = 'translateY(0px)';
+  });
+  slide.querySelectorAll('.bar-fill').forEach((bar, i) => { 
+    bar.style.width = '0%'; 
+    bar.style.transition = `width .6s ease ${i * .08}s`; 
+    bar.offsetHeight; 
+    bar.style.width = bar.dataset.width + '%'; 
+  });
+}
+
+window.initParticles = function(canvas, options) {
+  if (!canvas) return; 
+  const ctx = canvas.getContext('2d'); 
+  canvas.width = canvas.offsetWidth; 
+  canvas.height = canvas.offsetHeight;
+  
+  const interactive = options.interactive !== false; 
+  const count = options.count || (interactive ? 45 : 16); 
+  let mx = -1000, my = -1000;
+  
+  const particles = Array.from({length: count}, () => ({ 
+    x: Math.random()*canvas.width, 
+    y: Math.random()*canvas.height, 
+    vx: (Math.random()-.5)*.3, 
+    vy:(Math.random()-.5)*.3, 
+    size:Math.random()*2.2+.8, 
+    alpha:Math.random()*.35+.1 
+  }));
+  
+  if (interactive) { 
+    canvas.addEventListener('mousemove', e => { 
+        const r = canvas.getBoundingClientRect(); 
+        mx = e.clientX - r.left; 
+        my = e.clientY - r.top; 
+    }); 
+    canvas.addEventListener('mouseleave', () => { mx = -1000; my = -1000; }); 
+  }
+  
+  (function animate(){ 
+    ctx.clearRect(0,0,canvas.width,canvas.height); 
+    particles.forEach(p => { 
+        if (interactive) { 
+            const dx=p.x-mx, dy=p.y-my, dist=Math.sqrt(dx*dx+dy*dy); 
+            if (dist<120 && dist>0) { 
+                const force=(120-dist)/120*2; 
+                p.vx += (dx/dist)*force*.08; 
+                p.vy += (dy/dist)*force*.08; 
+            } 
+        } 
+        p.vx*=.985; p.vy*=.985; p.x+=p.vx; p.y+=p.vy; 
+        if(p.x<0)p.x=canvas.width; 
+        if(p.x>canvas.width)p.x=0; 
+        if(p.y<0)p.y=canvas.height; 
+        if(p.y>canvas.height)p.y=0; 
+        
+        ctx.beginPath(); 
+        ctx.arc(p.x,p.y,p.size,0,Math.PI*2); 
+        ctx.fillStyle=`rgba(124,58,237,${p.alpha})`; 
+        ctx.fill(); 
+    }); 
+    requestAnimationFrame(animate); 
+  })();
+};
+
+document.querySelectorAll('.particle-canvas').forEach(c => window.initParticles(c, { interactive:true, count:45 }));
+document.querySelectorAll('.particle-canvas-ambient').forEach(c => window.initParticles(c, { interactive:false, count:16 }));
+document.addEventListener('mousemove', e => { 
+    const s = document.querySelector('.mouse-spotlight'); 
+    if (s) s.style.background = `radial-gradient(520px circle at ${e.clientX}px ${e.clientY}px, rgba(6,182,212,.06), transparent 40%)`; 
+});
+
+// Init first slide
+animateSlide(document.querySelector('.slide.active'));
+</script>
+</body>
+</html>
